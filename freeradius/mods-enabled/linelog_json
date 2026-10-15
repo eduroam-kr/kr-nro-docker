@@ -1,0 +1,18 @@
+# One JSON line per final decision, joined to the main log by req.
+# 최종 결정 1건당 JSON 한 줄. 기본 로그와는 req 로 잇는다.
+# docs/logging.md
+
+linelog linelog_json {
+	filename = /var/log/eduroam/auth.json
+	permissions = 0644
+	format = ""
+	reference = "messages.%{%{reply:Packet-Type}:-default}"
+
+	messages {
+		default = ""
+
+		Access-Accept = "{\"ts\":\"%S\",\"req\":\"%n\",\"result\":\"ok\",\"reason\":\"\",\"mfm\":\"\",\"user\":\"%{User-Name}\",\"idp\":\"%{Tmp-String-0}\",\"op\":\"%{urlquote:%{Operator-Name}}\",\"client\":\"%{client:shortname}\",\"mac\":\"%{urlquote:%{Calling-Station-Id}}\",\"peer\":\"%{Packet-Src-IP-Address}\",\"nas_ip\":\"%{NAS-IP-Address}\",\"nas_id\":\"%{urlquote:%{NAS-Identifier}}\"}"
+
+		Access-Reject = "{\"ts\":\"%S\",\"req\":\"%n\",\"result\":\"reject\",\"reason\":\"%{Tmp-String-1}\",\"mfm\":\"%{Tmp-String-4}\",\"user\":\"%{User-Name}\",\"idp\":\"%{Tmp-String-0}\",\"op\":\"%{urlquote:%{Operator-Name}}\",\"client\":\"%{client:shortname}\",\"mac\":\"%{urlquote:%{Calling-Station-Id}}\",\"peer\":\"%{Packet-Src-IP-Address}\",\"nas_ip\":\"%{NAS-IP-Address}\",\"nas_id\":\"%{urlquote:%{NAS-Identifier}}\"}"
+	}
+}

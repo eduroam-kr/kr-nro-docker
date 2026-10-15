@@ -1,0 +1,83 @@
+# Assign Operator-Name for RO-relayed requests by NAS fingerprint.
+# RO 경유분의 방문기관을 NAS 지문으로 판별해 Operator-Name 을 붙인다.
+# docs/operator-name.md · docs-priv/ro-fingerprints.md
+
+kren_operator_name {
+#  Conditions use %{config:...}. ${...} does not expand here.
+#  조건문은 %{config:...} 을 쓴다. ${...} 는 여기서 풀리지 않는다.
+	if (&Packet-Src-IP-Address == "%{config:KREN_RO_IPADDR_173}" || \
+	    &Packet-Src-IP-Address == "%{config:KREN_RO_IPADDR_48}") {
+
+		#  ① NAS-Identifier that names the institution
+		#  ① NAS-Identifier 가 기관명인 것
+		if (&NAS-Identifier) {
+			if (&NAS-Identifier == 'POSTECH_WLC') {
+				update request { &Operator-Name := '1postech.ac.kr' }
+				updated
+			}
+			elsif (&NAS-Identifier == 'UNIST_WLC') {
+				update request { &Operator-Name := '1unist.ac.kr' }
+				updated
+			}
+			elsif (&NAS-Identifier =~ /^SKKU_WLC/) {
+				update request { &Operator-Name := '1skku.ac.kr' }
+				updated
+			}
+		}
+
+		#  ② Public NAS-IP ranges
+		#  ② 공인 NAS-IP 대역
+		if (!&Operator-Name && &NAS-IP-Address) {
+			if (&NAS-IP-Address < "%{config:SKKU_AC_KR_SUBNET}") {
+				update request { &Operator-Name := '1skku.ac.kr' }
+				updated
+			}
+			elsif (&NAS-IP-Address < "%{config:INHA_AC_KR_SUBNET}") {
+				update request { &Operator-Name := '1inha.ac.kr' }
+				updated
+			}
+			elsif (&NAS-IP-Address < "%{config:KNU_AC_KR_SUBNET}") {
+				update request { &Operator-Name := '1knu.ac.kr' }
+				updated
+			}
+			elsif (&NAS-IP-Address < "%{config:YU_AC_KR_SUBNET}") {
+				update request { &Operator-Name := '1yu.ac.kr' }
+				updated
+			}
+			elsif (&NAS-IP-Address < "%{config:SNU_AC_KR_SUBNET}") {
+				update request { &Operator-Name := '1snu.ac.kr' }
+				updated
+			}
+			elsif (&NAS-IP-Address < "%{config:KHU_AC_KR_SUBNET}") {
+				update request { &Operator-Name := '1khu.ac.kr' }
+				updated
+			}
+			elsif (&NAS-IP-Address < "%{config:CNU_AC_KR_SUBNET}") {
+				update request { &Operator-Name := '1cnu.ac.kr' }
+				updated
+			}
+			#  Reassigned ranges, narrowest first
+			#  재할당 구간 (좁은 것부터)
+			elsif (&NAS-IP-Address < "%{config:PKNU_AC_KR_SUBNET}") {
+				update request { &Operator-Name := '1pknu.ac.kr' }
+				updated
+			}
+			elsif (&NAS-IP-Address < "%{config:HUFS_AC_KR_SUBNET}") {
+				update request { &Operator-Name := '1hufs.ac.kr' }
+				updated
+			}
+			elsif (&NAS-IP-Address < "%{config:CHOSUN_AC_KR_SUBNET}") {
+				update request { &Operator-Name := '1chosun.ac.kr' }
+				updated
+			}
+			else {
+				#  Unknown fingerprint. Leave it empty.
+				#  미확인 지문. 비워 둔다.
+				noop
+			}
+		}
+	}
+	else {
+		noop
+	}
+}

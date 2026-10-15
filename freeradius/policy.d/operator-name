@@ -1,0 +1,18 @@
+# Assign Operator-Name from the client's own value; delegate the rest.
+# client 고유값으로 Operator-Name 을 붙이고, 나머지는 넘긴다.
+# docs/operator-name.md
+
+add_operator_name {
+	if (&Operator-Name) {
+		noop
+	}
+	elsif ("%{client:operator_name}") {
+		update request {
+			&Operator-Name := "%{client:operator_name}"
+		}
+		updated
+	}
+	else {
+		kren_operator_name
+	}
+}

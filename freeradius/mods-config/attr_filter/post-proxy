@@ -1,0 +1,21 @@
+# Attributes allowed on replies coming back from the home server.
+# 홈서버에서 돌아온 응답에서 허용할 속성.
+# docs/eduroam-settings.md
+
+DEFAULT
+	User-Name =* ANY,
+	Chargeable-User-Identity =* ANY,
+	EAP-Message =* ANY,
+	State =* ANY,
+	Message-Authenticator =* ANY,
+	Proxy-State =* ANY,
+	MS-MPPE-Recv-Key =* ANY,
+	MS-MPPE-Send-Key =* ANY,
+	MS-CHAP2-Success =* ANY,
+	MS-CHAP-Error =* ANY,
+	Reply-Message =* ANY,
+	Session-Timeout =* ANY,
+	Idle-Timeout =* ANY,
+	Termination-Action =* ANY,
+	Acct-Interim-Interval =* ANY,
+	Service-Type =* ANY

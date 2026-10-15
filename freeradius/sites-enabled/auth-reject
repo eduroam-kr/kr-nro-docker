@@ -1,0 +1,87 @@
+# Virtual server that rejects unroutable realms without proxying.
+# 라우팅 불가 realm 을 프록시하지 않고 거절하는 가상서버.
+# docs/blackhole.md
+
+server auth-reject {
+	authorize {
+#  Tell the user the correct realm when theirs is a typo or unregistered.
+#  오타·미등록 realm 은 올바른 realm 을 알려준다.
+#  국내 기관이 메일 도메인(.edu)을 realm 으로 쓰는 경우가 많다.
+		if (&User-Name =~ /@skku\.edu$/i) {
+			update reply {
+				&Reply-Message := "eduroam KR: use @skku.ac.kr (not @skku.edu)"
+			}
+		}
+		elsif (&User-Name =~ /@inha\.edu$/i) {
+			update reply {
+				&Reply-Message := "eduroam KR: use @inha.ac.kr (not @inha.edu)"
+			}
+		}
+		elsif (&User-Name =~ /@hanyang\.edu$/i) {
+			update reply {
+				&Reply-Message := "eduroam KR: use @hanyang.ac.kr (not @hanyang.edu)"
+			}
+		}
+		elsif (&User-Name =~ /@kaist\.edu$/i) {
+			update reply {
+				&Reply-Message := "eduroam KR: use @kaist.ac.kr (not @kaist.edu)"
+			}
+		}
+		elsif (&User-Name =~ /@korea\.edu$/i) {
+			update reply {
+				&Reply-Message := "eduroam KR: use @korea.ac.kr (not @korea.edu)"
+			}
+		}
+		elsif (&User-Name =~ /@snu\.edu$/i) {
+			update reply {
+				&Reply-Message := "eduroam KR: use @snu.ac.kr (not @snu.edu)"
+			}
+		}
+		elsif (&User-Name =~ /@cau\.edu$/i) {
+			update reply {
+				&Reply-Message := "eduroam KR: use @cau.ac.kr (not @cau.edu)"
+			}
+		}
+		elsif (&User-Name =~ /@postech\.edu$/i) {
+			update reply {
+				&Reply-Message := "eduroam KR: use @postech.ac.kr (not @postech.edu)"
+			}
+		}
+		elsif (&User-Name =~ /@knu\.edu\.kr$/i) {
+			update reply {
+				&Reply-Message := "eduroam KR: use @knu.ac.kr (not @knu.edu.kr)"
+			}
+		}
+		elsif (&User-Name =~ /@ac\.kr$/i) {
+			update reply {
+				&Reply-Message := "eduroam KR: realm must identify your institution, e.g. @yourschool.ac.kr"
+			}
+		}
+		else {
+			update reply {
+				&Reply-Message := "eduroam KR: realm is not routable"
+			}
+		}
+
+		reject
+	}
+
+	post-auth {
+		Post-Auth-Type REJECT {
+#  RFC 3579 2.6.5 — no Reply-Message in an EAP reply.
+#  RFC 3579 2.6.5 — EAP 응답에는 Reply-Message 를 넣지 않는다.
+#  응답에 EAP-Message 가 있으면 Reply-Message 를 제거한다.
+			remove_reply_message_if_eap
+
+#  Strip attributes not allowed in an Access-Reject
+#  Access-Reject 에 허용되지 않는 속성 제거
+			attr_filter.access_reject
+
+#  Marker: we rejected this. Must come after both filters above.
+#  우리가 끊었다는 표식. 반드시 위 두 필터보다 뒤에 둔다. docs/logging.md
+			update reply {
+				&Tmp-String-9 := 'local_reject'
+			}
+		}
+	}
+}

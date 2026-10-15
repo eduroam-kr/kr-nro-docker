@@ -1,0 +1,32 @@
+# Attributes allowed on requests we send onward.
+# 프록시로 내보내는 요청에서 허용할 속성.
+# docs/eduroam-settings.md
+
+DEFAULT
+	User-Name =* ANY,
+	User-Password =* ANY,
+	CHAP-Password =* ANY,
+	CHAP-Challenge =* ANY,
+	MS-CHAP-Challenge =* ANY,
+	MS-CHAP-Response =* ANY,
+	MS-CHAP2-Response =* ANY,
+	EAP-Message =* ANY,
+	State =* ANY,
+	Message-Authenticator =* ANY,
+	Proxy-State =* ANY,
+	NAS-IP-Address =* ANY,
+	NAS-IPv6-Address =* ANY,
+	NAS-Identifier =* ANY,
+	NAS-Port =* ANY,
+	NAS-Port-Type =* ANY,
+	NAS-Port-Id =* ANY,
+	Called-Station-Id =* ANY,
+	Calling-Station-Id =* ANY,
+	Operator-Name =* ANY,
+	Chargeable-User-Identity =* ANY,
+	Service-Type =* ANY,
+	Framed-MTU =* ANY,
+	Connect-Info =* ANY,
+	Acct-Session-Id =* ANY,
+	Acct-Multi-Session-Id =* ANY,
+	Event-Timestamp =* ANY

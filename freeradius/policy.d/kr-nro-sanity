@@ -1,0 +1,59 @@
+# Extra User-Name hygiene beyond upstream filter_username.
+# upstream filter_username 이 잡지 못하는 User-Name 을 추가로 막는다.
+# docs/input-validation.md
+
+kr_sanity_username {
+#  No User-Name at all
+#  User-Name 이 아예 없음
+	if (!&User-Name) {
+		update request {
+			&Module-Failure-Message += 'Rejected: no User-Name'
+		}
+		reject
+	}
+
+#  Tabs, newlines, other control characters. filter_username only checks spaces.
+#  탭·개행·기타 제어문자. filter_username 은 스페이스만 본다.
+	if (&User-Name =~ /[\x00-\x1f\x7f]/) {
+		update request {
+			&Module-Failure-Message += 'Rejected: control character in User-Name'
+		}
+		reject
+	}
+
+#  Characters a domain cannot contain. Only alphanumerics, hyphen and dot.
+#  realm 에 허용되지 않는 문자. 도메인은 영숫자·하이픈·점만 쓴다.
+	if ((&User-Name =~ /@(.*)$/) && ("%{1}" =~ /[^a-zA-Z0-9.-]/)) {
+		update request {
+			&Module-Failure-Message += 'Rejected: invalid character in realm'
+		}
+		reject
+	}
+
+#  Backslash in the local part. It breaks the log JSON, so the line is lost.
+#  로컬파트의 역슬래시. 로그 JSON 이 깨져 유실된다. 16진 [\x5c] 로 쓴다.
+	if (&User-Name =~ /[\x5c]/) {
+		update request {
+			&Module-Failure-Message += 'Rejected: backslash in User-Name local part'
+		}
+		reject
+	}
+
+#  Realm length limit (DNS 253). The strlen xlat does not parse in a condition.
+#  realm 길이 제한(DNS 253). strlen xlat 은 조건문에서 파싱되지 않는다.
+	if (&User-Name =~ /@.{254,}$/) {
+		update request {
+			&Module-Failure-Message += 'Rejected: realm too long'
+		}
+		reject
+	}
+
+#  Drop obvious attack strings. A reply tells a scanner we are here.
+#  명백한 공격 문자열은 버린다. 응답은 스캐너에게 신호가 된다.
+	if (&User-Name =~ /(\.\.\/|<script|union[ +]select|\x27[ ]*or[ ]*\x27)/i) {
+		update request {
+			&Module-Failure-Message += 'Dropped: attack pattern in User-Name'
+		}
+		do_not_respond
+	}
+}

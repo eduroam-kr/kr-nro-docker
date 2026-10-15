@@ -1,0 +1,132 @@
+# Pure proxy. No local users, no EAP termination.
+# 순수 프록시. 로컬 사용자도 EAP 종단도 없다.
+# docs/radius-routing.md · docs/logging.md
+
+server default {
+	listen {
+		type = auth
+		ipaddr = *
+		port = 1812
+	}
+	listen {
+		type = acct
+		ipaddr = *
+		port = 1813
+	}
+
+	authorize {
+		#  Removed 2026-10-01. See docs/input-validation.md
+		#  2026-10-01 제거. 이유는 docs/input-validation.md
+		#utf8
+
+# Reject spaces, multiple @, consecutive dots, dotless realms (upstream policy)
+# 공백·다중 @·연속 점·점 없는 realm 등 거절 (upstream 정책)
+		filter_username
+
+# Extra checks: control characters, bad realm characters, excessive length
+# 제어문자·realm 이상문자·과도한 길이 등 추가 검사 (policy.d/kr-nro-sanity)
+		kr_sanity_username
+
+# Normalise malformed NAS attributes
+# 깨진 NAS 속성 정규화
+		preprocess
+
+# Normalise MAC to RFC 3580 form. Institutions differ, which breaks statistics.
+# MAC 을 RFC3580 형식으로 통일. 기관마다 표기가 달라 통계가 깨진다.
+		rewrite_calling_station_id
+
+# Assign Operator-Name. Never overwrite what the SP already sent.
+# Operator-Name 부여. SP 가 이미 넣었으면 덮지 않는다. docs/operator-name.md
+		add_operator_name
+
+# Keep the real realm for the log. Must be saved before suffix strips it.
+# 실제 realm 보존(로그의 idp). suffix 가 떼기 전에 저장해야 한다.
+		if (&User-Name =~ /@([^@]+)$/) {
+			update request {
+				&Tmp-String-0 := "%{1}"
+			}
+		}
+
+# Split user@realm, then look the realm up. A match proxies automatically.
+# user@realm 분리 후 realm 조회. 매칭되면 자동 프록시된다.
+		suffix
+
+	}
+
+	authenticate {
+# Everything is proxied, so there is no local authentication
+# 전부 프록시되므로 로컬 인증 없음
+	}
+
+	preacct {
+		preprocess
+		suffix
+	}
+
+	accounting {
+# Accounting is proxied too, via acct_pool
+# 어카운팅도 acct_pool 로 함께 프록시된다
+	}
+
+# Attribute filters for the proxy leg. Disabled by default.
+# 프록시 구간 속성 필터. 기본 비활성. docs/eduroam-settings.md
+# One structured log line per final decision
+# 최종 결과 1건당 구조화 로그 한 줄.
+	post-auth {
+		linelog_json
+
+		Post-Auth-Type REJECT {
+# Record the failure as a classified value. Four traps: docs/logging.md
+# 실패 사유를 분류값으로 남긴다. 함정 넷과 시험 절차는 docs/logging.md
+			update request {
+				&Tmp-String-1 := 'other'
+			}
+# Check the marker auth-reject set, before anything else
+# auth-reject 가 세운 표식을 먼저 본다. 근거는 docs/logging.md
+			if (&proxy-reply:Tmp-String-9) {
+				update request { &Tmp-String-1 := 'local_reject' }
+			}
+			elsif (&proxy-reply:Packet-Type) {
+				if (&proxy-reply:Packet-Type == Access-Reject) {
+					update request { &Tmp-String-1 := 'home_reject' }
+				}
+			}
+			elsif (&Module-Failure-Message) {
+				if (&Module-Failure-Message =~ /^(Rejected|Dropped): /) {
+					update request { &Tmp-String-1 := 'sanity' }
+				}
+				elsif (&Module-Failure-Message =~ /(failed to respond|lack of any response)/) {
+					update request { &Tmp-String-1 := 'home_timeout' }
+				}
+				elsif (&Module-Failure-Message =~ /Failed to find live home server/) {
+					update request { &Tmp-String-1 := 'no_home_server' }
+				}
+				elsif (&Module-Failure-Message =~ /No Auth-Type found/) {
+					update request { &Tmp-String-1 := 'no_auth_type' }
+				}
+				elsif (&Module-Failure-Message =~ /evaluate condition/) {
+					update request { &Tmp-String-1 := 'cond_error' }
+				}
+			}
+			else {
+				update request { &Tmp-String-1 := 'none' }
+			}
+
+# urlquote the original message. Raw text breaks the JSON.
+# 원문은 urlquote 로 인코딩한다. 그대로 넣으면 JSON 이 깨진다. docs/logging.md
+			update request {
+				&Tmp-String-4 := "%{urlquote:%{Module-Failure-Message}}"
+			}
+
+			linelog_json
+		}
+	}
+
+	pre-proxy {
+#		attr_filter.pre-proxy
+	}
+
+	post-proxy {
+#		attr_filter.post-proxy
+	}
+}
