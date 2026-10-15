@@ -32,6 +32,8 @@ git config submodule.private.url <실제 경로나 주소>
 git submodule update --init
 ```
 
+URL 이 같은 장비의 경로면 `git submodule update --init` 이 `transport 'file' not allowed` 로 막힌다(CVE-2022-39253). 그 한 번만 `git -c protocol.file.allow=always` 를 앞에 붙인다.
+
 권한이 없으면 네 링크가 빈 곳을 가리킬 뿐, 나머지는 그대로 읽힌다.
 
 **주소는 쓰지 않는다.** 예시가 필요하면 RFC 5737 문서용 대역(`203.0.113.10` 등)을 쓴다. 우리 주소든 남의 주소든 마찬가지다 — 공개된 주소라도 **우리 문서가 그것을 적어 둘 이유**는 별개다.
