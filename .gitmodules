@@ -1,0 +1,12 @@
+# 비공개 서브모듈 하나. 공개 저장소에는 커밋 해시만 남는다.
+#
+# URL 은 자리표시다. 접근 권한이 있는 사람이 자기 환경에서 지정한다.
+#   git config submodule.private.url <실제 경로나 주소>
+#   git submodule update --init
+#
+# secrets.d · docs-priv · pki 는 이 안으로 가는 심볼릭 링크다.
+# 권한이 없으면 세 링크가 빈 곳을 가리킬 뿐, 나머지는 그대로 읽힌다.
+
+[submodule "private"]
+	path = private
+	url = ../kr-nro-private.git
