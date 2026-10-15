@@ -12,7 +12,7 @@
 verify error num=19 self-signed certificate in chain
 ```
 
-원인은 우리 CA 번들에 **자체 CA 한 장만** 들어 있어 ETLR 서버 인증서 체인의 상위 루트를 검증할 수 없는 것이다. 인바운드(2083)는 실사용이 0건이었고 국제 경로는 `proxy.conf` 의 UDP 직결을 쓰므로, 중지해도 영향이 없었다.
+원인은 CA 번들에 **자체 CA 한 장만** 들어 있어 ETLR 서버 인증서 체인의 상위 루트를 검증할 수 없는 것이었다. 인바운드(2083)는 실사용이 0건이었고 국제 경로는 `proxy.conf` 의 UDP 직결을 쓰므로, 중지해도 영향이 없었다.
 
 되살리려면 **필요한 루트를 `pki/certs/eduroam-ca.pem` 에 추가**한 뒤 `docker-compose.yml` 의 `radsecproxy` 블록 주석을 풀고 올린다. 그 블록은 주석만 풀면 그대로 동작하도록 두었다.
 
