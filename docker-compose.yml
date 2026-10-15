@@ -1,0 +1,92 @@
+# eduroam KR NRO
+#
+# Host network mode. RADIUS identifies clients by source IP, so avoiding NAT
+# keeps logs and policy unambiguous. Containers talk over the loopback.
+# 호스트 네트워크 모드. RADIUS 는 출발지 IP 로 클라이언트를 식별하므로 NAT 를
+# 거치지 않는 편이 로그·정책이 명확하다. 컨테이너끼리는 루프백으로 대화한다.
+#
+# Deployment-specific values come from .env. See .env.example.
+# 배포마다 다른 값은 .env 에서 온다. .env.example 참고.
+services:
+  freeradius:
+    image: freeradius/freeradius-server:3.2.10-alpine
+    container_name: kr-nro-freeradius
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./freeradius/radiusd.conf:/opt/etc/raddb/radiusd.conf:ro
+      - ./freeradius/clients.conf:/opt/etc/raddb/clients.conf:ro
+      - ./freeradius/proxy.conf:/opt/etc/raddb/proxy.conf:ro
+      - ./freeradius/blackhole.conf:/opt/etc/raddb/blackhole.conf:ro
+      - ./freeradius/kren_ro.conf:/opt/etc/raddb/kren_ro.conf:ro
+      - ./freeradius/policy.d/kr-nro-sanity:/opt/etc/raddb/policy.d/kr-nro-sanity:ro
+      - ./freeradius/policy.d/operator-name:/opt/etc/raddb/policy.d/operator-name:ro
+      - ./freeradius/policy.d/kren-operator-name:/opt/etc/raddb/policy.d/kren-operator-name:ro
+      - ./freeradius/conf.d:/opt/etc/raddb/conf.d:ro
+      - ./freeradius/secrets.d:/opt/etc/raddb/secrets.d:ro
+      - ./freeradius/sites-enabled:/opt/etc/raddb/sites-enabled:ro
+      - ./freeradius/mods-enabled/eap:/opt/etc/raddb/mods-enabled/eap:ro
+      - ./freeradius/mods-enabled/linelog_json:/opt/etc/raddb/mods-enabled/linelog_json:ro
+      - /var/log/eduroam:/var/log/eduroam
+      - ./freeradius/mods-config/attr_filter/pre-proxy:/opt/etc/raddb/mods-config/attr_filter/pre-proxy:ro
+      - ./freeradius/mods-config/attr_filter/post-proxy:/opt/etc/raddb/mods-config/attr_filter/post-proxy:ro
+# Production: log the outcome only.
+# 운영 모드. 인증 결과만 남긴다.
+    command: ["radiusd", "-f", "-l", "stdout"]
+# Debug only. One request prints 100+ lines, tens of MB a minute.
+# 장애 추적할 때만. 요청 하나에 100줄 넘게 찍혀 분당 수십 MB 가 쌓인다.
+#   command: ["radiusd", "-f", "-X"]
+
+  # ── radsecproxy — TBD. docs/radsec-migration.md ────────────────
+  #
+  # radsecproxy:
+  #   build: ./radsecproxy
+  #   image: local/radsecproxy:1.11.2
+  #   container_name: kr-nro-radsecproxy
+  #   restart: unless-stopped
+  #   network_mode: host
+  #   volumes:
+  #     - /etc/localtime:/etc/localtime:ro
+  #     - ./radsecproxy/radsecproxy.conf:/etc/radsecproxy.conf:ro
+  #     - ./radsecproxy/nro-direct-realms.conf:/etc/radsecproxy/nro-direct-realms.conf:ro
+  #     - ./pki/certs:/etc/radsecproxy/pki/certs:ro
+  #     - ./logs/radsecproxy:/var/log/radsecproxy
+  #   environment:
+  #     - LOCALHOST_SECRET=${LOCALHOST_SECRET:?set in .env}
+  #     - ETLR_HOST_1=${ETLR_HOST_1:?set in .env}
+  #     - ETLR_HOST_2=${ETLR_HOST_2:?set in .env}
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: kr-nro-promtail
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./promtail.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log/eduroam:/var/log/eduroam:ro
+      - ./data/promtail:/var/lib/promtail
+    environment:
+      - LOG_HOST=${LOG_HOST:?set in .env}
+      - NRO_HOSTNAME=${NRO_HOSTNAME:?set in .env}
+# -config.expand-env lets the config read ${...} from the environment.
+# -config.expand-env 를 켜야 설정에서 ${...} 를 읽는다.
+    command: ["-config.file=/etc/promtail/config.yml", "-config.expand-env=true"]
+
+  vector:
+    image: timberio/vector:0.39.0-alpine
+    container_name: kr-nro-vector
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - CH_PASSWORD=${CH_PASSWORD:?set in .env}
+      - LOG_HOST=${LOG_HOST:?set in .env}
+      - SYNTHETIC_CLIENT=${SYNTHETIC_CLIENT:-none}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./vector.yaml:/etc/vector/vector.yaml:ro
+      - /var/log/eduroam:/var/log/eduroam:ro
+      - ./data/vector:/var/lib/vector

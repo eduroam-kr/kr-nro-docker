@@ -1,0 +1,41 @@
+# Ship container logs and the structured auth log to Loki.
+# 컨테이너 로그와 구조화 인증 로그를 Loki 로 보낸다.
+#
+# Values come from .env through docker compose (-config.expand-env=true).
+# 값은 .env 에서 docker compose 를 거쳐 들어온다. 복사해 고칠 것이 없다.
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+# Persisted outside the container; otherwise a recreate re-reads every file
+# from the start and Loki rejects the backfill as too old.
+# 컨테이너 밖에 보존한다. 없으면 재생성 때 파일을 처음부터 다시 읽어
+# Loki 가 "too far behind" 로 거부한다.
+positions:
+  filename: /var/lib/promtail/positions.yaml
+clients:
+  - url: http://${LOG_HOST}:3100/loki/api/v1/push
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+        # docker sd does not support max_age. Raise Loki's rate limit instead.
+        # docker sd 는 max_age 를 지원하지 않는다. Loki rate limit 상향으로 대응한다.
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - target_label: 'host'
+        replacement: '${NRO_HOSTNAME}'
+
+  # Structured auth events. `| json` in Loki turns them into fields directly.
+  # Keep only low-cardinality labels; query op/mac/id as fields.
+  # 구조화 인증 이벤트. Loki 에서 `| json` 으로 바로 필드가 된다.
+  # 라벨은 저카디널리티만 둔다. op·mac·id 는 필드로 조회한다.
+  - job_name: nro-auth-json
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: nro-auth-json
+          host: ${NRO_HOSTNAME}
+          __path__: /var/log/eduroam/auth.json

@@ -1,0 +1,71 @@
+# Structured auth log (JSON) -> ClickHouse
+# 구조화 인증 로그(JSON) -> ClickHouse 적재
+#
+# Tails the file freeradius' linelog writes and aggregates it into time buckets.
+# Independent of promtail. Opened read-only, so freeradius is never affected.
+# freeradius 의 linelog 가 쓴 파일을 tail 해서 시간 버킷으로 집계해 넣는다.
+# promtail 과 별개로 동작하며, 읽기 전용으로만 열어 freeradius 에 영향이 없다.
+#
+# Values come from .env through docker compose. Nothing to copy or edit.
+# 값은 .env 에서 docker compose 를 거쳐 들어온다. 복사해 고칠 것이 없다.
+sources:
+  auth_json:
+    type: file
+    include:
+      - /var/log/eduroam/auth.json
+    read_from: end
+
+transforms:
+  parsed:
+    type: remap
+    inputs: [auth_json]
+    drop_on_abort: true
+    source: |
+      . = object!(parse_json!(.message))
+
+      # Exclude synthetic traffic (monitoring and the like) from statistics.
+      # 합성 트래픽(감시용 등)은 통계에서 제외한다. client 이름을 채워 쓴다.
+      if .client == "${SYNTHETIC_CLIENT}" { abort }
+
+      # Time bucket (floor). Zeroing minutes and seconds is the bucketing.
+      # freeradius stamps local time; Vector formats UTC, so hour is stored UTC.
+      # 시간 버킷(floor). 분·초를 00 으로 고정하는 것이 곧 버킷이다.
+      # freeradius 는 현지 시각으로 찍고 Vector 는 UTC 로 포맷하므로 hour 는 UTC 다.
+      # 표시는 Grafana 에서 현지 시각으로 한다.
+      ts = parse_timestamp!(.ts, format: "%Y-%m-%d %H:%M:%S")
+      .hour = format_timestamp!(ts, format: "%Y-%m-%d %H:00:00")
+
+      .id     = string!(.user)
+      .mac    = string!(.mac)
+      .idp    = string!(.idp)
+      .op     = string!(.op)
+      .client = string!(.client)
+      .auth   = if .result == "ok" { "ok" } else { "reject" }
+      .count  = 1
+
+      # reason was added later, so older lines lack it. string!() would abort
+      # on those and throw the whole line away.
+      # reason 은 나중에 추가된 필드라 그 이전 줄에는 없다. string!() 를 쓰면
+      # 없을 때 abort 되어 과거 줄이 통째로 버려진다.
+      .reason = to_string(.reason) ?? ""
+
+      # Keep only the ClickHouse columns; the rest are MATERIALIZED.
+      # ClickHouse 컬럼만 남긴다. 나머지는 MATERIALIZED 가 계산한다.
+      . = { "hour": .hour, "id": .id, "mac": .mac, "idp": .idp,
+            "op": .op, "client": .client, "auth": .auth, "count": .count,
+            "reason": .reason }
+
+sinks:
+  clickhouse:
+    type: clickhouse
+    inputs: [parsed]
+    endpoint: http://${LOG_HOST}:8123
+    database: eduroam
+    table: eduroam_hourly
+    auth:
+      strategy: basic
+      user: eduroam
+      password: ${CH_PASSWORD}
+    batch:
+      timeout_secs: 30
+    skip_unknown_fields: false
